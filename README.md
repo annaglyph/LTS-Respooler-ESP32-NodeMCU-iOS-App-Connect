@@ -26,6 +26,17 @@ Everything else, including **Bluetooth connectivity to the LTS apps**, remains s
 
 ---
 
+## 🙏 Credits
+
+- Original code project and full-feature firmware: [**LukasT03/LTS-Respooler**](https://github.com/LukasT03/LTS-Respooler)
+- 3D print files: [**LTS Respooler Motorized Filament Winder**](https://makerworld.com/en/models/448008-lts-respooler-motorized-filament-winder#profileId-1962243)
+- Hardware kits and additional information: [**LTS Design**](https://lts-design.com/)
+- ESP32 NodeMCU adaptation: [annaglyph](https://github.com/annaglyph)  
+
+This fork is provided without an explicit license. Please note that the **original LTS Respooler code does not specify a license**, which means it is “all rights reserved” by default. Use responsibly and with attribution.
+
+---
+
 ## 🔧 Hardware Setup
 
 - **Board:** WEMOS D1 Mini ESP32 (ESP-WROOM-32 module)  
@@ -39,16 +50,5 @@ Everything else, including **Bluetooth connectivity to the LTS apps**, remains s
 - **1x** - Power Jack Plug - Female 5.5mm x 2.1mm 12V
 
 ![Wiring Diagram](docs/circuit-diagram.png)
-
----
-
-## 🙏 Credits
-
-- Original code project and full-feature firmware: [**LukasT03/LTS-Respooler**](https://github.com/LukasT03/LTS-Respooler)
-- 3D print files: [**LTS Respooler Motorized Filament Winder**](https://makerworld.com/en/models/448008-lts-respooler-motorized-filament-winder#profileId-1962243)
-- Hardware kits and additional information: [**LTS Design**](https://lts-design.com/)
-- ESP32 NodeMCU adaptation: [annaglyph](https://github.com/annaglyph)  
-
-This fork is provided without an explicit license. Please note that the **original LTS Respooler code does not specify a license**, which means it is “all rights reserved” by default. Use responsibly and with attribution.
 
 ---

@@ -50,6 +50,8 @@ Everything else, including **Bluetooth connectivity to the LTS apps**, remains s
 
 ![Wiring Diagram](docs/circuit-diagram.png)
 
+![Soldered PCB Breadboard](docs/soldered-pcb-breadboard.jpg)
+
 ---
 
 ## 🚀 Getting Started
@@ -87,9 +89,13 @@ Install the following via Arduino Library Manager:
 2. Open the **LTS iOS app** or the [LTS Design Web App](https://lts-design.com/pages/software).  
 3. Pair via **Bluetooth**.  
 4. Use the app to:
-   - Start or stop spooling  
-   - Change motor direction  
-   - Monitor progress and filament sensor status  
+   - Start or stop spooling
+   - Adjust speed of motor  
+   - Change motor direction
+   - Adjust LED brightness
+   - Enable filament sensor use  
+   - Monitor progress, filament sensor status, and Bluetooth connection
+   - Monitor ESP32 chip temperature  
 
 ---
 

@@ -3,9 +3,15 @@
 #include <ArduinoJson.h>
 #include <math.h>
 
+// ------------------- BLE UUIDs -----------------------------------
 #define SERVICE_UUID        "9E05D06D-68A7-4E1F-A503-AE26713AC101"
 #define CHARACTERISTIC_UUID "7CB2F1B4-7E3F-43D2-8C92-DF58C9A7B1A8"
 
+// ------------------------ Board Info ----------------------------
+#define FIRMWARE_VERSION "0.0.1"
+#define BOARD_NAME "esp32 PCB"
+
+// --------------------- Hardware Pin Defines ---------------------
 #define LED1_PIN            16
 #define LED2_PIN            17
 #define LED_CONN_PIN        2
@@ -15,19 +21,22 @@
 #define EN_PIN              19
 #define BUTTON_PIN          21
 
-#define START_INTERVAL      550
-#define DEFAULT_INTERVAL    140
+#define START_INTERVAL      700
+#define DEFAULT_INTERVAL    146
 
+// ------------------- Direct settings variables -------------------
+int speedPercent = 80;                         // 50-100
 bool deviceConnected = false;
-bool isMotorRunning = false;
+bool isMotorRunning = false;                    // true, false
 bool shouldStartMotorNow = false;
 bool filamentDetected = false;
 bool useFilamentSensor = true;
 int motorDirection = 0;
-int ledBrightness = 50;
+int ledBrightness = 50;                         // 0-100
 int pwmValue = 0;
 int jingleStyle = 1;
 int triggerJingleNow = 0;
+char currentState = 'I';
 
 bool pendingDirectionChange = false;
 int newMotorDirection = 0;
@@ -68,12 +77,20 @@ int calculatePWM(int brightnessPercent) {
 // ================== sendStatus ==================
 
 void sendStatus(bool forceSend = false) {
+  int chipTemp = (int)temperatureRead();
+
   StaticJsonDocument<256> doc;
-  doc["STAT"]    = isMotorRunning ? "R" : "I";
+  doc["STAT"]    = String(currentState);
   doc["HAS_FIL"] = filamentDetected;
   doc["USE_FIL"] = useFilamentSensor;
   doc["PROG"]    = progress;
   doc["REM"]     = totalEstimatedTime / 1000;  // seconds
+  doc["SPD"]     = speedPercent;
+  doc["JIN"]     = jingleStyle;
+  doc["LED"]     = ledBrightness;
+  doc["DIR"]     = motorDirection;
+  doc["FW"]      = FIRMWARE_VERSION;
+  doc["TEMP"]    = chipTemp;
 
   String out;
   serializeJson(doc, out);
@@ -158,9 +175,25 @@ void handleCommand(const std::string& cmd) {
       if (isMotorRunning) {
         isMotorRunning = false;
         digitalWrite(EN_PIN, HIGH);   // disable driver
-        digitalWrite(STEP_PIN, LOW);  // stop stepping
-        sendDone();                   // notify client
+        digitalWrite(STEP_PIN, LOW);
+        currentState = 'I';  // stop stepping
+        sendStatus(true);                   // notify client
       }
+    }
+    else if (command == "PAUSE") {
+        if (isMotorRunning) {
+            isMotorRunning = false;
+            digitalWrite(EN_PIN, HIGH);
+            digitalWrite(STEP_PIN, LOW);
+            unsigned long elapsed = 0;
+            if (spoolingStartTime > 0) {
+                elapsed = millis() - spoolingStartTime;
+            }
+            //pausedElapsed = elapsed;
+            spoolingStartTime = 0;
+            currentState = 'P';
+            sendStatus(true);
+        }
     }
   }
   if (doc.containsKey("SET")) {
@@ -187,7 +220,7 @@ void handleCommand(const std::string& cmd) {
     if (set.containsKey("SPD")) {
       int speed = constrain((int)set["SPD"], 50, 100);
       targetStepIntervalMicros = map(speed, 50, 100, 170, 93);
-      // speedPercent = speed;
+      speedPercent = speed;
       prefs.begin("respooler", false);
       prefs.putUInt("speed", targetStepIntervalMicros);
       prefs.end();
@@ -244,7 +277,9 @@ void setup() {
     Serial.println("Kalibrierung 80%: " + String(calibrationAt80Speed));
     pwmValue = calculatePWM(ledBrightness);
 
-    NimBLEDevice::init("Respooler");
+    NimBLEDevice::init(BOARD_NAME);
+    NimBLEDevice::setPower(ESP_PWR_LVL_P6);
+    NimBLEDevice::setMTU(512);
     NimBLEServer* pServer = NimBLEDevice::createServer();
     pServer->setCallbacks(new MyServerCallbacks());
 
@@ -257,7 +292,11 @@ void setup() {
 
     pService->start();
     NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
-    pAdvertising->addServiceUUID(SERVICE_UUID);
+    NimBLEAdvertisementData advData;
+    //pAdvertising->addServiceUUID(SERVICE_UUID);
+    advData.setName(BOARD_NAME);
+    advData.addServiceUUID(SERVICE_UUID);
+    pAdvertising->setAdvertisementData(advData);
     pAdvertising->start();
 
     int startupPWM = calculatePWM(50);
@@ -267,6 +306,7 @@ void setup() {
     analogWrite(LED1_PIN, 0);
     analogWrite(LED2_PIN, 0);
     analogWrite(LED_CONN_PIN, 0);
+    currentState = 'I';
 }
 
 void loop() {
@@ -296,7 +336,8 @@ void loop() {
         isMotorRunning = false;
         digitalWrite(EN_PIN, HIGH);
         digitalWrite(STEP_PIN, LOW);
-        sendDone();                // zuerst Done senden
+        currentState = 'D';
+        sendStatus(true);                // zuerst Done senden
         playStepperJingle();      // dann Jingle spielen
         progress = 0.0;
         totalEstimatedTime = 0;
@@ -319,9 +360,11 @@ void loop() {
             stepIntervalMicros = START_INTERVAL;
             lastAccelUpdate = now;
             isMotorRunning = true;
+            currentState = 'R';
+            sendStatus(true);
             spoolingStartTime = now;
             // Berechne geschätzte Zeit auf Basis des Kalibrierwerts bei 80%
-            int speedPercent = map(targetStepIntervalMicros, 200, 100, 50, 100);
+            speedPercent = map(targetStepIntervalMicros, 200, 100, 50, 100);
             totalEstimatedTime = calibrationAt80Speed * (80.0 / speedPercent);
         }
         shouldStartMotorNow = false;
@@ -349,6 +392,8 @@ void loop() {
                     isMotorRunning = false;
                     digitalWrite(EN_PIN, HIGH);
                     digitalWrite(STEP_PIN, LOW);
+                    currentState = 'P';
+                    sendStatus(true);
                 }
             }
             lastStableState = reading;
@@ -374,7 +419,7 @@ void loop() {
                 stepIntervalMicros = targetStepIntervalMicros;
         }
         // Aktualisiere totalEstimatedTime basierend auf aktueller Geschwindigkeit
-        int speedPercent = map(stepIntervalMicros, 200, 100, 50, 100);
+        speedPercent = map(stepIntervalMicros, 200, 100, 50, 100);
         unsigned long newTotal = calibrationAt80Speed * (80.0 / speedPercent);
         // Passe spoolingStartTime entsprechend an, um den Fortschritt zu erhalten
         unsigned long elapsed = millis() - spoolingStartTime;
